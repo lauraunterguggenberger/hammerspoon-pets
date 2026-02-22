@@ -599,6 +599,7 @@ hs.hotkey.bind(hyper, "y", function() bunny.toggle() end)
 hs.hotkey.bind(nudge, "y", function() bunny.toggle() end)
 hs.hotkey.bind(nudge, "b", function() bunny.toggle() end)  -- fallback if Ctrl+Opt+y is captured
 hs.hotkey.bind(nudge, "h", function() bunny.scare() end)  -- nudge+h = scare into rabbit hole
+hs.hotkey.bind(nudge, "v", function() bunny.vampire() end)  -- nudge+v = vampire mode (10 sec, then kiss)
 
 -- =============================================================================
 -- 17. PIG  (hyper+p, nudge+p to toggle, nudge+m to scare into mud)

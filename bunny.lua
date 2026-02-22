@@ -20,6 +20,7 @@ local DARK     = {red=0.12, green=0.08, blue=0.12, alpha=1   }
 local SOFTGRAY = {red=0.72, green=0.72, blue=0.72, alpha=0.35}
 local CLEAR    = {red=0,    green=0,    blue=0,    alpha=0   }
 local HEARTRED = {red=1,    green=0.2,  blue=0.3,  alpha=1   }
+local BLOODRED = {red=0.7,  green=0.05, blue=0.05, alpha=1   }  -- vampire fangs/blood
 local BLACK    = {red=0.05, green=0.05, blue=0.08, alpha=1   }  -- hole interior
 
 -- ─── element indices (same in both canvases) ─────────────────────────────────
@@ -29,6 +30,7 @@ local I = {
   eye=8, nose=9, mouth=10, zzz=11,
   backArm=12, frontArm=13, heart=14, footL=15, footR=16,
   eye2=17,  -- second eye (layback only; face-on view)
+  fangL=18, fangR=19, bloodDrop=20,  -- vampire mode
 }
 local HIDDEN = {x=0, y=0, w=0, h=0}
 
@@ -52,6 +54,10 @@ local BR = {
   -- Lay-back pose: reclined body, prominent hind feet
   footL     = {x=12, y=88, w=22, h=18},
   footR     = {x=51, y=88, w=22, h=18},
+  -- Vampire mode: red fangs + blood drop (replace nose)
+  fangL     = {x=74, y=57, w=4,  h=14},
+  fangR     = {x=82, y=57, w=4,  h=14},
+  bloodDrop = {x=77, y=68, w=6,  h=8 },
 }
 
 -- Lay-back pose: body/head/tail/ears repositioned for reclined posture
@@ -67,6 +73,9 @@ local LAYBACK_R = {
   eye2    = {x=37,  y=58, w=9,  h=9 },  -- left eye (face-on)
   nose    = {x=55,  y=68, w=6,  h=6 },
   mouth   = {x=38,  y=70, w=18, h=14},
+  fangL   = {x=52,  y=66, w=3,  h=12},
+  fangR   = {x=58,  y=66, w=3,  h=12},
+  bloodDrop = {x=54, y=74, w=5, h=6 },
 }
 
 -- ─── base frames for facing LEFT (pre-computed, ears swapped for correct depth)
@@ -90,6 +99,9 @@ local BL = {
   heart     = mir(BR.heart),
   footL     = mir(BR.footL),
   footR     = mir(BR.footR),
+  fangL     = mir(BR.fangL),
+  fangR     = mir(BR.fangR),
+  bloodDrop = mir(BR.bloodDrop),
 }
 
 local LAYBACK_L = {
@@ -101,9 +113,12 @@ local LAYBACK_L = {
   innerFar = mir(LAYBACK_R.innerNear),
   innerNear= mir(LAYBACK_R.innerFar),
   eye     = mir(LAYBACK_R.eye),
-  eye2    = mir(LAYBACK_R.eye2),
-  nose    = mir(LAYBACK_R.nose),
-  mouth   = mir(LAYBACK_R.mouth),
+  eye2     = mir(LAYBACK_R.eye2),
+  nose     = mir(LAYBACK_R.nose),
+  mouth    = mir(LAYBACK_R.mouth),
+  fangL    = mir(LAYBACK_R.fangL),
+  fangR    = mir(LAYBACK_R.fangR),
+  bloodDrop= mir(LAYBACK_R.bloodDrop),
 }
 
 -- Rabbit hole: black opening, head + ears peeking up (scared by pop)
@@ -137,6 +152,10 @@ local blinkIn    = 120 + math.random(80)
 local zOff       = 0
 local zAge       = 0
 local ballBounce = 0   -- extra jump when hit by ball
+local vampireMode = false
+local vampireUntil = 0   -- timestamp when to exit vampire mode
+local vampireKiss = false  -- true during kiss-goodbye phase
+local vampireKissAge = 0
 
 -- ─── animation parameters ────────────────────────────────────────────────────
 local WALK = 1.6
@@ -168,7 +187,10 @@ local function buildCanvas(f)
       text=hs.styledtext.new("♥", {font={name="Helvetica", size=22}, color=HEARTRED}) },
     { type="oval",      frame=HIDDEN,      fillColor=WHITE,    strokeColor=SOFTGRAY, strokeWidth=1 },
     { type="oval",      frame=HIDDEN,      fillColor=WHITE,    strokeColor=SOFTGRAY, strokeWidth=1 },
-    { type="oval",      frame=HIDDEN,      fillColor=DARK,     strokeColor=CLEAR,    strokeWidth=0 }
+    { type="oval",      frame=HIDDEN,      fillColor=DARK,     strokeColor=CLEAR,    strokeWidth=0 },
+    { type="rectangle", frame=HIDDEN,      fillColor=BLOODRED, strokeColor=CLEAR,    strokeWidth=0, roundedRectRadii={xRadius=1,yRadius=1} },
+    { type="rectangle", frame=HIDDEN,      fillColor=BLOODRED, strokeColor=CLEAR,    strokeWidth=0, roundedRectRadii={xRadius=1,yRadius=1} },
+    { type="oval",      frame=HIDDEN,      fillColor=BLOODRED, strokeColor=CLEAR,    strokeWidth=0 }
   )
   return c
 end
@@ -234,6 +256,7 @@ local function setState(s)
     canvas[I.eye2].frame = HIDDEN
     canvas[I.nose].frame = base.nose
     canvas[I.mouth].frame = base.mouth
+    hideVampireFace()
     canvas[I.footL].frame = HIDDEN
     canvas[I.footR].frame = HIDDEN
     laybackFrames = nil
@@ -247,6 +270,25 @@ local function showHeartPose()
   canvas[I.heart].frame = base.heart
   canvas[I.footL].frame = HIDDEN
   canvas[I.footR].frame = HIDDEN
+end
+
+local function showVampireFace()
+  canvas[I.nose].frame = HIDDEN
+  canvas[I.fangL].frame = base.fangL
+  canvas[I.fangR].frame = base.fangR
+  canvas[I.bloodDrop].frame = base.bloodDrop
+  if state == "layback" and laybackFrames then
+    canvas[I.fangL].frame = laybackFrames.fangL
+    canvas[I.fangR].frame = laybackFrames.fangR
+    canvas[I.bloodDrop].frame = laybackFrames.bloodDrop
+  end
+end
+
+local function hideVampireFace()
+  canvas[I.nose].frame = (state == "layback" and laybackFrames) and laybackFrames.nose or base.nose
+  canvas[I.fangL].frame = HIDDEN
+  canvas[I.fangR].frame = HIDDEN
+  canvas[I.bloodDrop].frame = HIDDEN
 end
 
 local function showLaybackPose()
@@ -267,6 +309,7 @@ local function showLaybackPose()
   canvas[I.heart].frame = HIDDEN
   canvas[I.footL].frame = base.footL
   canvas[I.footR].frame = base.footR
+  if vampireMode then showVampireFace() else hideVampireFace() end
 end
 
 local HOLE_STROKE = {red=0.15, green=0.15, blue=0.2, alpha=1}  -- dark edge for hole
@@ -292,6 +335,9 @@ local function showHolePose()
   canvas[I.eye2].frame = HOLE.eye2
   canvas[I.nose].frame = HOLE.nose
   canvas[I.mouth].frame = HOLE.mouth
+  canvas[I.fangL].frame = HIDDEN
+  canvas[I.fangR].frame = HIDDEN
+  canvas[I.bloodDrop].frame = HIDDEN
 end
 
 -- Flip: hide the current canvas, show the other one at the same position.
@@ -317,6 +363,23 @@ local function animate()
 
   local screen = hs.screen.mainScreen():frame()
   local gY     = screen.y + screen.h - CH - 22
+
+  -- VAMPIRE: time's up → kiss goodbye then return to normal
+  if vampireMode and hs.timer.secondsSinceEpoch() >= vampireUntil then
+    vampireMode = false
+    hideVampireFace()
+    setState("heart")
+    showHeartPose()
+    vampireKiss = true
+    vampireKissAge = 0
+  end
+  if vampireKiss then
+    vampireKissAge = vampireKissAge + 1
+    if vampireKissAge > 90 then  -- ~3 sec kiss
+      vampireKiss = false
+      setState("idle")
+    end
+  end
 
   -- BLINK
   if blinkIn <= 0 then
@@ -411,7 +474,17 @@ local function animate()
     canvas[I.head].frame     = {x=HOLE.head.x + peek, y=HOLE.head.y, w=HOLE.head.w, h=HOLE.head.h}
     canvas[I.eye].frame      = {x=HOLE.eye.x + peek,  y=HOLE.eye.y,  w=HOLE.eye.w,  h=HOLE.eye.h }
     canvas[I.eye2].frame     = {x=HOLE.eye2.x + peek, y=HOLE.eye2.y, w=HOLE.eye2.w, h=HOLE.eye2.h}
-    canvas[I.nose].frame     = {x=HOLE.nose.x + peek, y=HOLE.nose.y, w=HOLE.nose.w, h=HOLE.nose.h}
+    if vampireMode then
+      canvas[I.nose].frame = HIDDEN
+      canvas[I.fangL].frame = {x=48 + peek, y=76, w=3, h=10}
+      canvas[I.fangR].frame = {x=58 + peek, y=76, w=3, h=10}
+      canvas[I.bloodDrop].frame = {x=51 + peek, y=82, w=5, h=6}
+    else
+      canvas[I.nose].frame = {x=HOLE.nose.x + peek, y=HOLE.nose.y, w=HOLE.nose.w, h=HOLE.nose.h}
+      canvas[I.fangL].frame = HIDDEN
+      canvas[I.fangR].frame = HIDDEN
+      canvas[I.bloodDrop].frame = HIDDEN
+    end
     canvas[I.mouth].frame    = {x=HOLE.mouth.x + peek, y=HOLE.mouth.y, w=HOLE.mouth.w, h=HOLE.mouth.h}
     local jump = (ballBounce > 0 and -math.abs(math.sin(ballBounce * 0.2)) * 24 or 0)
     canvas:topLeft({x=math.floor(posX), y=math.floor(gY + jump)})
@@ -442,6 +515,11 @@ local function animate()
         {font={name="Helvetica", size=10}, color=CLEAR})
       setState("hop")
     end
+  end
+
+  -- vampire face override (apply every frame when active)
+  if vampireMode and not vampireKiss then
+    showVampireFace()
   end
 end
 
@@ -582,8 +660,9 @@ M._HOPH      = HOPH
 M._HOPR      = HOPR
 M._WALK      = WALK
 M._EARB      = EARB
-M._getState  = function() return state end
-M._getCanvas = function() return canvas end
+M._getState   = function() return state end
+M._getCanvas  = function() return canvas end
+M._isVampire  = function() return vampireMode end
 
 function M.getBounds()
   if not canvas then return nil end
@@ -595,6 +674,19 @@ end
 function M.bounce()
   if not canvas then return end
   ballBounce = 18
+end
+
+function M.vampire()
+  if not canvas then return end
+  vampireMode = true
+  vampireUntil = hs.timer.secondsSinceEpoch() + 10
+  vampireKiss = false
+  if state == "sleep" then
+    openEyes()
+    canvas[I.zzz].text = hs.styledtext.new("z z z", {font={name="Helvetica", size=10}, color=CLEAR})
+    setState("idle")
+  end
+  showVampireFace()
 end
 
 return M

@@ -97,6 +97,7 @@ do
   local standardKeys = {
     "tail", "body", "head", "eye", "nose", "mouth", "zzz",
     "backArm", "frontArm", "heart", "footL", "footR",
+    "fangL", "fangR", "bloodDrop",  -- vampire mode
   }
   for _, key in ipairs(standardKeys) do
     local expected = mir(B[key])
@@ -297,6 +298,26 @@ do
   bunny.stop()
   local okBounceStop, _ = pcall(function() bunny.bounce() end)
   ok("bounce when stopped: no error", okBounceStop)
+end
+
+-- ─── 11. vampire() API ────────────────────────────────────────────────────────
+
+do
+  bunny.stop()
+  -- vampire when stopped: no-op, no error
+  local okVamp, errVamp = pcall(function() bunny.vampire() end)
+  ok("vampire when stopped: no error", okVamp, tostring(errVamp))
+  eq("vampire when stopped: canvas still nil", nil, bunny._getCanvas())
+  ok("vampire when stopped: not in vampire mode", not bunny._isVampire())
+
+  -- start, trigger vampire
+  bunny.toggle()
+  eq("vampire prep: canvas exists", true, bunny._getCanvas() ~= nil)
+  bunny.vampire()
+  ok("vampire when running: no error", true)
+  ok("vampire when running: enters vampire mode", bunny._isVampire())
+
+  bunny.stop()
 end
 
 -- ─── report ───────────────────────────────────────────────────────────────────
