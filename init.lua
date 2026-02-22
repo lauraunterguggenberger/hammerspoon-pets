@@ -608,3 +608,18 @@ local pig = require("pig")
 hs.hotkey.bind(hyper, "p", function() pig.toggle() end)
 hs.hotkey.bind(nudge, "p", function() pig.toggle() end)
 hs.hotkey.bind(nudge, "m", function() pig.scare() end)  -- nudge+m = scare into mud puddle
+
+-- =============================================================================
+-- 18. BALL  (nudge+t to throw — bounces, pets jump when hit)
+-- =============================================================================
+
+local ball = require("ball")
+ball.registerPet(bunny)
+ball.registerPet(pig)
+hs.hotkey.bind(nudge, "t", function() ball.throw() end)
+
+-- Run all tests: mash+` (backtick)
+hs.hotkey.bind(mash, "`", function()
+  package.loaded["tests"] = nil
+  require("tests")
+end)

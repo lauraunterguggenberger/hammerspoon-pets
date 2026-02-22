@@ -142,6 +142,7 @@ local blinkIn    = 120 + math.random(80)
 local zOff       = 0
 local zAge       = 0
 local tailWiggle = 0
+local ballBounce = 0   -- extra jump when hit by ball
 
 -- ─── animation parameters ────────────────────────────────────────────────────
 local TROT  = 1.4
@@ -344,6 +345,7 @@ local function animate()
 
   stateAge = stateAge + 1
   blinkIn = blinkIn - 1
+  if ballBounce > 0 then ballBounce = ballBounce - 1 end
 
   local screen = hs.screen.mainScreen():frame()
   local gY = screen.y + screen.h - CH - 22
@@ -390,7 +392,8 @@ local function animate()
     elseif posX <= minX then posX = minX; flip(gY)
     end
 
-    canvas:topLeft({x=math.floor(posX), y=math.floor(gY + sway)})
+    local jump = (ballBounce > 0 and -math.abs(math.sin(ballBounce * 0.2)) * 22 or 0)
+    canvas:topLeft({x=math.floor(posX), y=math.floor(gY + sway + jump)})
 
     if stateAge > 360 and math.random() < 0.005 then
       setState("roll"); showRollPose()
@@ -399,7 +402,8 @@ local function animate()
     end
 
   elseif state == "idle" then
-    canvas:topLeft({x=math.floor(posX), y=gY})
+    local jump = (ballBounce > 0 and -math.abs(math.sin(ballBounce * 0.2)) * 22 or 0)
+    canvas:topLeft({x=math.floor(posX), y=math.floor(gY + jump)})
     if math.random() < 0.008 then earWiggle = 12 end
     if stateAge > 200 then
       local r = math.random()
@@ -408,19 +412,23 @@ local function animate()
     end
 
   elseif state == "heart" then
-    canvas:topLeft({x=math.floor(posX), y=gY})
+    local jump = (ballBounce > 0 and -math.abs(math.sin(ballBounce * 0.2)) * 22 or 0)
+    canvas:topLeft({x=math.floor(posX), y=math.floor(gY + jump)})
     if stateAge > 75 then setState("idle") end
 
   elseif state == "wave" then
-    canvas:topLeft({x=math.floor(posX), y=gY})
+    local jump = (ballBounce > 0 and -math.abs(math.sin(ballBounce * 0.2)) * 22 or 0)
+    canvas:topLeft({x=math.floor(posX), y=math.floor(gY + jump)})
     if stateAge > 75 then setState("idle") end
 
   elseif state == "oink" then
-    canvas:topLeft({x=math.floor(posX), y=gY})
+    local jump = (ballBounce > 0 and -math.abs(math.sin(ballBounce * 0.2)) * 22 or 0)
+    canvas:topLeft({x=math.floor(posX), y=math.floor(gY + jump)})
     if stateAge > 45 then setState("idle") end
 
   elseif state == "roll" then
-    canvas:topLeft({x=math.floor(posX), y=gY})
+    local jump = (ballBounce > 0 and -math.abs(math.sin(ballBounce * 0.2)) * 22 or 0)
+    canvas:topLeft({x=math.floor(posX), y=math.floor(gY + jump)})
     if stateAge > 140 and math.random() < 0.012 then setState("trot") end
 
   elseif state == "inmud" then
@@ -432,11 +440,13 @@ local function animate()
     canvas[I.eye2].frame    = {x=MUD_PUDDLE.eye2.x + peek,    y=MUD_PUDDLE.eye2.y,    w=MUD_PUDDLE.eye2.w,    h=MUD_PUDDLE.eye2.h}
     canvas[I.snout].frame   = {x=MUD_PUDDLE.snout.x + peek,    y=MUD_PUDDLE.snout.y,   w=MUD_PUDDLE.snout.w,   h=MUD_PUDDLE.snout.h}
     canvas[I.mouth].frame   = {x=MUD_PUDDLE.mouth.x + peek,   y=MUD_PUDDLE.mouth.y,  w=MUD_PUDDLE.mouth.w,  h=MUD_PUDDLE.mouth.h}
-    canvas:topLeft({x=math.floor(posX), y=gY})
+    local jump = (ballBounce > 0 and -math.abs(math.sin(ballBounce * 0.2)) * 22 or 0)
+    canvas:topLeft({x=math.floor(posX), y=math.floor(gY + jump)})
     if stateAge > 90 and math.random() < 0.008 then setState("trot") end
 
   elseif state == "sleep" then
-    canvas:topLeft({x=math.floor(posX), y=gY})
+    local jump = (ballBounce > 0 and -math.abs(math.sin(ballBounce * 0.2)) * 22 or 0)
+    canvas:topLeft({x=math.floor(posX), y=math.floor(gY + jump)})
     zAge = zAge + 1
     if zAge % 90 == 0 then zOff = 0 end
     zOff = zOff + 0.5
@@ -586,5 +596,17 @@ M._TROT = TROT
 M._SWAY = SWAY
 M._getState = function() return state end
 M._getCanvas = function() return canvas end
+
+function M.getBounds()
+  if not canvas then return nil end
+  local screen = hs.screen.mainScreen():frame()
+  local gY = screen.y + screen.h - CH - 22
+  return {x=posX, y=gY, w=CW, h=CH}
+end
+
+function M.bounce()
+  if not canvas then return end
+  ballBounce = 18
+end
 
 return M

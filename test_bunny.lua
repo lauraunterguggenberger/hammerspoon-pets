@@ -276,6 +276,29 @@ do
   bunny.stop()
 end
 
+-- ─── 10. getBounds() and bounce() (for ball collision) ───────────────────────────
+
+do
+  bunny.stop()
+  eq("getBounds when stopped: nil", nil, bunny.getBounds())
+
+  bunny.toggle()
+  local b = bunny.getBounds()
+  ok("getBounds when running: non-nil", b ~= nil)
+  ok("getBounds has x", b and b.x ~= nil)
+  ok("getBounds has y", b and b.y ~= nil)
+  ok("getBounds has w", b and b.w == bunny._CW)
+  ok("getBounds has h", b and b.h == bunny._CH)
+
+  -- bounce() when running: no error
+  local okBounce, errBounce = pcall(function() bunny.bounce() end)
+  ok("bounce when running: no error", okBounce, tostring(errBounce))
+
+  bunny.stop()
+  local okBounceStop, _ = pcall(function() bunny.bounce() end)
+  ok("bounce when stopped: no error", okBounceStop)
+end
+
 -- ─── report ───────────────────────────────────────────────────────────────────
 
 local summary = string.format(

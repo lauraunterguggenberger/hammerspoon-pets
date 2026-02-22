@@ -136,6 +136,7 @@ local earWiggle  = 0
 local blinkIn    = 120 + math.random(80)
 local zOff       = 0
 local zAge       = 0
+local ballBounce = 0   -- extra jump when hit by ball
 
 -- ─── animation parameters ────────────────────────────────────────────────────
 local WALK = 1.6
@@ -312,6 +313,7 @@ local function animate()
 
   stateAge = stateAge + 1
   blinkIn  = blinkIn  - 1
+  if ballBounce > 0 then ballBounce = ballBounce - 1 end
 
   local screen = hs.screen.mainScreen():frame()
   local gY     = screen.y + screen.h - CH - 22
@@ -364,7 +366,7 @@ local function animate()
       posX = minX;  flip(gY)
     end
 
-    canvas:topLeft({x=math.floor(posX), y=math.floor(gY + bounce)})
+    canvas:topLeft({x=math.floor(posX), y=math.floor(gY + bounce + (ballBounce > 0 and -math.abs(math.sin(ballBounce * 0.2)) * 24 or 0))})
 
     -- hop too long → lay back and rest
     if stateAge > 360 and math.random() < 0.005 then
@@ -375,7 +377,8 @@ local function animate()
 
   -- ── IDLE ──────────────────────────────────────────────────────────────────
   elseif state == "idle" then
-    canvas:topLeft({x=math.floor(posX), y=gY})
+    local jump = (ballBounce > 0 and -math.abs(math.sin(ballBounce * 0.2)) * 24 or 0)
+    canvas:topLeft({x=math.floor(posX), y=math.floor(gY + jump)})
     if math.random() < 0.008 then earWiggle = 14 end
     if stateAge > 200 then
       local r = math.random()
@@ -386,12 +389,14 @@ local function animate()
 
   -- ── HEART ───────────────────────────────────────────────────────────────────
   elseif state == "heart" then
-    canvas:topLeft({x=math.floor(posX), y=gY})
+    local jump = (ballBounce > 0 and -math.abs(math.sin(ballBounce * 0.2)) * 24 or 0)
+    canvas:topLeft({x=math.floor(posX), y=math.floor(gY + jump)})
     if stateAge > 75 then setState("idle") end
 
   -- ── LAYBACK ────────────────────────────────────────────────────────────────
   elseif state == "layback" then
-    canvas:topLeft({x=math.floor(posX), y=gY})
+    local jump = (ballBounce > 0 and -math.abs(math.sin(ballBounce * 0.2)) * 24 or 0)
+    canvas:topLeft({x=math.floor(posX), y=math.floor(gY + jump)})
     if stateAge > 140 and math.random() < 0.012 then
       setState("hop")
     end
@@ -408,7 +413,8 @@ local function animate()
     canvas[I.eye2].frame     = {x=HOLE.eye2.x + peek, y=HOLE.eye2.y, w=HOLE.eye2.w, h=HOLE.eye2.h}
     canvas[I.nose].frame     = {x=HOLE.nose.x + peek, y=HOLE.nose.y, w=HOLE.nose.w, h=HOLE.nose.h}
     canvas[I.mouth].frame    = {x=HOLE.mouth.x + peek, y=HOLE.mouth.y, w=HOLE.mouth.w, h=HOLE.mouth.h}
-    canvas:topLeft({x=math.floor(posX), y=gY})
+    local jump = (ballBounce > 0 and -math.abs(math.sin(ballBounce * 0.2)) * 24 or 0)
+    canvas:topLeft({x=math.floor(posX), y=math.floor(gY + jump)})
     -- peek long enough, decide it's safe
     if stateAge > 90 and math.random() < 0.008 then
       setState("hop")
@@ -416,7 +422,8 @@ local function animate()
 
   -- ── SLEEP ─────────────────────────────────────────────────────────────────
   elseif state == "sleep" then
-    canvas:topLeft({x=math.floor(posX), y=gY})
+    local jump = (ballBounce > 0 and -math.abs(math.sin(ballBounce * 0.2)) * 24 or 0)
+    canvas:topLeft({x=math.floor(posX), y=math.floor(gY + jump)})
 
     zAge = zAge + 1
     if zAge % 90 == 0 then zOff = 0 end
@@ -577,5 +584,17 @@ M._WALK      = WALK
 M._EARB      = EARB
 M._getState  = function() return state end
 M._getCanvas = function() return canvas end
+
+function M.getBounds()
+  if not canvas then return nil end
+  local screen = hs.screen.mainScreen():frame()
+  local gY = screen.y + screen.h - CH - 22
+  return {x=posX, y=gY, w=CW, h=CH}
+end
+
+function M.bounce()
+  if not canvas then return end
+  ballBounce = 18
+end
 
 return M
