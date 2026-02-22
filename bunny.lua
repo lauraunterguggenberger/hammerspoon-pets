@@ -30,7 +30,8 @@ local I = {
   eye=8, nose=9, mouth=10, zzz=11,
   backArm=12, frontArm=13, heart=14, footL=15, footR=16,
   eye2=17,  -- second eye (layback only; face-on view)
-  fangL=18, fangR=19, bloodDrop=20,  -- vampire mode
+  fangL=18, fangR=19, bloodDrop=20,  -- vampire: fangs + mouth interior
+  bubble=21, bubbleTail=22, bloodEmoji=23,  -- vampire thought bubble
 }
 local HIDDEN = {x=0, y=0, w=0, h=0}
 
@@ -121,6 +122,26 @@ local LAYBACK_L = {
   bloodDrop= mir(LAYBACK_R.bloodDrop),
 }
 
+-- Vampire pose: face-on, eyes+nose visible, mouth with sharp teeth, blood emoji in thought bubble
+local VAMPIRE = {
+  body      = {x=2,   y=72, w=86, h=28},  -- same as LAYBACK
+  head      = {x=30,  y=38, w=40, h=42},
+  tail      = {x=10,  y=78, w=16, h=12},
+  earFar    = {x=48,  y=8,  w=18, h=36},
+  earNear   = {x=28,  y=6,  w=20, h=38},
+  innerFar  = {x=52, y=12, w=10, h=28},
+  innerNear = {x=30, y=10, w=12, h=30},
+  eye       = {x=54, y=58, w=9,  h=9 },
+  eye2      = {x=37, y=58, w=9,  h=9 },
+  nose      = {x=55, y=68, w=6,  h=6 },
+  mouthOpen = {x=40, y=72, w=30, h=10},  -- BLOODRED oval (bloodDrop)
+  fangL     = {x=43, y=66, w=3,  h=14},  -- left canine
+  fangR     = {x=64, y=66, w=3,  h=14},  -- right canine
+  bubble    = {x=18, y=0,  w=74, h=34},
+  bubbleTail= {x=48, y=32, w=14, h=10},
+  bloodEmoji= {x=34, y=6,  w=42, h=24},
+}
+
 -- Rabbit hole: black opening, head + ears peeking up (scared by pop)
 local HOLE = {
   hole   = {x=12,  y=78,  w=86,  h=32},  -- black oval opening
@@ -190,7 +211,11 @@ local function buildCanvas(f)
     { type="oval",      frame=HIDDEN,      fillColor=DARK,     strokeColor=CLEAR,    strokeWidth=0 },
     { type="rectangle", frame=HIDDEN,      fillColor=BLOODRED, strokeColor=CLEAR,    strokeWidth=0, roundedRectRadii={xRadius=1,yRadius=1} },
     { type="rectangle", frame=HIDDEN,      fillColor=BLOODRED, strokeColor=CLEAR,    strokeWidth=0, roundedRectRadii={xRadius=1,yRadius=1} },
-    { type="oval",      frame=HIDDEN,      fillColor=BLOODRED, strokeColor=CLEAR,    strokeWidth=0 }
+    { type="oval",      frame=HIDDEN,      fillColor=BLOODRED, strokeColor=CLEAR,    strokeWidth=0 },
+    { type="rectangle", frame=HIDDEN,     fillColor=WHITE,     strokeColor=SOFTGRAY, strokeWidth=1, roundedRectRadii={xRadius=12,yRadius=12} },
+    { type="oval",      frame=HIDDEN,     fillColor=WHITE,     strokeColor=SOFTGRAY, strokeWidth=1 },
+    { type="text",      frame=HIDDEN,     textAlignment="center",
+      text=hs.styledtext.new("🩸", {font={name="Apple Color Emoji", size=22}}) }
   )
   return c
 end
@@ -203,7 +228,11 @@ end
 
 -- ─── state helpers ───────────────────────────────────────────────────────────
 local function closeEyes()
-  if state == "layback" and laybackFrames then
+  if state == "vampire" then
+    local e1, e2 = VAMPIRE.eye, VAMPIRE.eye2
+    canvas[I.eye].frame  = {x=e1.x, y=e1.y + 4, w=e1.w, h=2}
+    canvas[I.eye2].frame = {x=e2.x, y=e2.y + 4, w=e2.w, h=2}
+  elseif state == "layback" and laybackFrames then
     local e1, e2 = laybackFrames.eye, laybackFrames.eye2
     canvas[I.eye].frame  = {x=e1.x, y=e1.y + 4, w=e1.w, h=2}
     canvas[I.eye2].frame = {x=e2.x, y=e2.y + 4, w=e2.w, h=2}
@@ -218,7 +247,10 @@ local function closeEyes()
 end
 
 local function openEyes()
-  if state == "layback" and laybackFrames then
+  if state == "vampire" then
+    canvas[I.eye].frame  = VAMPIRE.eye
+    canvas[I.eye2].frame = VAMPIRE.eye2
+  elseif state == "layback" and laybackFrames then
     canvas[I.eye].frame  = laybackFrames.eye
     canvas[I.eye2].frame = laybackFrames.eye2
   elseif state == "inhole" and holeActive then
@@ -231,6 +263,17 @@ end
 
 local laybackFrames  -- LAYBACK_R or LAYBACK_L, used to restore when exiting
 local holeActive     -- true when in rabbit hole pose
+local vampireActive  -- true when in vampire pose
+
+local function hideVampirePose()
+  canvas[I.bubble].frame = HIDDEN
+  canvas[I.bubbleTail].frame = HIDDEN
+  canvas[I.bloodEmoji].frame = HIDDEN
+  canvas[I.fangL].frame = HIDDEN
+  canvas[I.fangR].frame = HIDDEN
+  canvas[I.bloodDrop].frame = HIDDEN
+  vampireActive = false
+end
 
 local function setState(s)
   state = s;  stateAge = 0;  zOff = 0;  zAge = 0
@@ -240,8 +283,9 @@ local function setState(s)
     canvas[I.frontArm].frame = HIDDEN
     canvas[I.heart].frame = HIDDEN
   end
-  -- restore body/head/tail/ears when leaving layback or inhole
-  if s ~= "layback" and s ~= "inhole" and (laybackFrames or holeActive) then
+  -- restore body/head/tail/ears when leaving layback, inhole, or vampire
+  if s ~= "layback" and s ~= "inhole" and s ~= "vampire" and (laybackFrames or holeActive or vampireActive) then
+    if vampireActive then hideVampirePose() end
     canvas[I.body].frame = base.body
     canvas[I.body].fillColor = WHITE
     canvas[I.body].strokeColor = SOFTGRAY
@@ -256,7 +300,7 @@ local function setState(s)
     canvas[I.eye2].frame = HIDDEN
     canvas[I.nose].frame = base.nose
     canvas[I.mouth].frame = base.mouth
-    hideVampireFace()
+    canvas[I.mouth].text = hs.styledtext.new("ω", {font={name="Helvetica", size=13}, color=DARK})
     canvas[I.footL].frame = HIDDEN
     canvas[I.footR].frame = HIDDEN
     laybackFrames = nil
@@ -272,23 +316,34 @@ local function showHeartPose()
   canvas[I.footR].frame = HIDDEN
 end
 
-local function showVampireFace()
-  canvas[I.nose].frame = HIDDEN
-  canvas[I.fangL].frame = base.fangL
-  canvas[I.fangR].frame = base.fangR
-  canvas[I.bloodDrop].frame = base.bloodDrop
-  if state == "layback" and laybackFrames then
-    canvas[I.fangL].frame = laybackFrames.fangL
-    canvas[I.fangR].frame = laybackFrames.fangR
-    canvas[I.bloodDrop].frame = laybackFrames.bloodDrop
-  end
-end
-
-local function hideVampireFace()
-  canvas[I.nose].frame = (state == "layback" and laybackFrames) and laybackFrames.nose or base.nose
-  canvas[I.fangL].frame = HIDDEN
-  canvas[I.fangR].frame = HIDDEN
-  canvas[I.bloodDrop].frame = HIDDEN
+local function showVampirePose()
+  vampireActive = true
+  canvas[I.zzz].frame = HIDDEN  -- hide sleep "z z z" if coming from sleep
+  canvas[I.body].frame = VAMPIRE.body
+  canvas[I.head].frame = VAMPIRE.head
+  canvas[I.tail].frame = VAMPIRE.tail
+  canvas[I.earFar].frame = VAMPIRE.earFar
+  canvas[I.earNear].frame = VAMPIRE.earNear
+  canvas[I.innerFar].frame = VAMPIRE.innerFar
+  canvas[I.innerNear].frame = VAMPIRE.innerNear
+  canvas[I.eye].frame = VAMPIRE.eye
+  canvas[I.eye2].frame = VAMPIRE.eye2
+  canvas[I.nose].frame = VAMPIRE.nose
+  canvas[I.mouth].frame = HIDDEN  -- omega hidden; we use bloodDrop + fangs for mouth
+  canvas[I.backArm].frame = HIDDEN
+  canvas[I.frontArm].frame = HIDDEN
+  canvas[I.heart].frame = HIDDEN
+  canvas[I.footL].frame = base.footL
+  canvas[I.footR].frame = base.footR
+  -- mouth: red oval interior + two sharp fangs
+  canvas[I.bloodDrop].frame = VAMPIRE.mouthOpen
+  canvas[I.bloodDrop].fillColor = BLOODRED
+  canvas[I.fangL].frame = VAMPIRE.fangL
+  canvas[I.fangR].frame = VAMPIRE.fangR
+  -- thought bubble with blood emoji
+  canvas[I.bubble].frame = VAMPIRE.bubble
+  canvas[I.bubbleTail].frame = VAMPIRE.bubbleTail
+  canvas[I.bloodEmoji].frame = VAMPIRE.bloodEmoji
 end
 
 local function showLaybackPose()
@@ -309,7 +364,12 @@ local function showLaybackPose()
   canvas[I.heart].frame = HIDDEN
   canvas[I.footL].frame = base.footL
   canvas[I.footR].frame = base.footR
-  if vampireMode then showVampireFace() else hideVampireFace() end
+  canvas[I.fangL].frame = HIDDEN
+  canvas[I.fangR].frame = HIDDEN
+  canvas[I.bloodDrop].frame = HIDDEN
+  canvas[I.bubble].frame = HIDDEN
+  canvas[I.bubbleTail].frame = HIDDEN
+  canvas[I.bloodEmoji].frame = HIDDEN
 end
 
 local HOLE_STROKE = {red=0.15, green=0.15, blue=0.2, alpha=1}  -- dark edge for hole
@@ -367,7 +427,6 @@ local function animate()
   -- VAMPIRE: time's up → kiss goodbye then return to normal
   if vampireMode and hs.timer.secondsSinceEpoch() >= vampireUntil then
     vampireMode = false
-    hideVampireFace()
     setState("heart")
     showHeartPose()
     vampireKiss = true
@@ -391,7 +450,7 @@ local function animate()
   end
 
   -- EAR WIGGLE (on keypress; skip when in hole - no ears visible)
-  if earWiggle > 0 and state ~= "inhole" then
+  if earWiggle > 0 and state ~= "inhole" and state ~= "vampire" then
     earWiggle = earWiggle - 1
     local wobble = ((earWiggle % 2 == 0) and 4 or -4) * M._dir
     local nf, nif = base.earNear, base.innerNear
@@ -464,6 +523,12 @@ local function animate()
       setState("hop")
     end
 
+  -- ── VAMPIRE (face-on, sharp teeth, blood emoji in thought bubble) ──────────
+  elseif state == "vampire" then
+    local jump = (ballBounce > 0 and -math.abs(math.sin(ballBounce * 0.2)) * 24 or 0)
+    canvas:topLeft({x=math.floor(posX), y=math.floor(gY + jump)})
+    -- pose is set by showVampirePose; no movement
+
   -- ── INHOLE (scared, peeking to see if safe) ─────────────────────────────────
   elseif state == "inhole" then
     local peek = math.sin(stateAge * 0.06) * 4  -- head/ears peek left/right
@@ -474,17 +539,10 @@ local function animate()
     canvas[I.head].frame     = {x=HOLE.head.x + peek, y=HOLE.head.y, w=HOLE.head.w, h=HOLE.head.h}
     canvas[I.eye].frame      = {x=HOLE.eye.x + peek,  y=HOLE.eye.y,  w=HOLE.eye.w,  h=HOLE.eye.h }
     canvas[I.eye2].frame     = {x=HOLE.eye2.x + peek, y=HOLE.eye2.y, w=HOLE.eye2.w, h=HOLE.eye2.h}
-    if vampireMode then
-      canvas[I.nose].frame = HIDDEN
-      canvas[I.fangL].frame = {x=48 + peek, y=76, w=3, h=10}
-      canvas[I.fangR].frame = {x=58 + peek, y=76, w=3, h=10}
-      canvas[I.bloodDrop].frame = {x=51 + peek, y=82, w=5, h=6}
-    else
-      canvas[I.nose].frame = {x=HOLE.nose.x + peek, y=HOLE.nose.y, w=HOLE.nose.w, h=HOLE.nose.h}
-      canvas[I.fangL].frame = HIDDEN
-      canvas[I.fangR].frame = HIDDEN
-      canvas[I.bloodDrop].frame = HIDDEN
-    end
+    canvas[I.nose].frame     = {x=HOLE.nose.x + peek, y=HOLE.nose.y, w=HOLE.nose.w, h=HOLE.nose.h}
+    canvas[I.fangL].frame    = HIDDEN
+    canvas[I.fangR].frame    = HIDDEN
+    canvas[I.bloodDrop].frame= HIDDEN
     canvas[I.mouth].frame    = {x=HOLE.mouth.x + peek, y=HOLE.mouth.y, w=HOLE.mouth.w, h=HOLE.mouth.h}
     local jump = (ballBounce > 0 and -math.abs(math.sin(ballBounce * 0.2)) * 24 or 0)
     canvas:topLeft({x=math.floor(posX), y=math.floor(gY + jump)})
@@ -515,11 +573,6 @@ local function animate()
         {font={name="Helvetica", size=10}, color=CLEAR})
       setState("hop")
     end
-  end
-
-  -- vampire face override (apply every frame when active)
-  if vampireMode and not vampireKiss then
-    showVampireFace()
   end
 end
 
@@ -558,7 +611,7 @@ function M.start()
               canvas[I.zzz].text = hs.styledtext.new("z z z",
                 {font={name="Helvetica", size=10}, color=CLEAR})
               setState("inhole"); showHolePose()
-            elseif state == "hop" or state == "idle" or state == "heart" or state == "layback" then
+            elseif state == "hop" or state == "idle" or state == "heart" or state == "layback" or state == "vampire" then
               setState("inhole"); showHolePose()
             elseif state == "inhole" then
               -- another pop while hiding = stay longer (reset timer)
@@ -586,7 +639,7 @@ function M.start()
         setState("hop")  -- keypress = safe, emerge from hole
         return false
       end
-      if state == "layback" then
+      if state == "layback" or state == "vampire" then
         setState("hop")
         return false
       end
@@ -641,7 +694,7 @@ function M.scare()
     openEyes()
     canvas[I.zzz].text = hs.styledtext.new("z z z", {font={name="Helvetica", size=10}, color=CLEAR})
   end
-  if state == "hop" or state == "idle" or state == "heart" or state == "layback" or state == "sleep" then
+  if state == "hop" or state == "idle" or state == "heart" or state == "layback" or state == "vampire" or state == "sleep" then
     setState("inhole")
     showHolePose()
   end
@@ -653,6 +706,7 @@ M._B         = BR
 M._BL        = BL
 M._LAYBACK_R = LAYBACK_R
 M._LAYBACK_L = LAYBACK_L
+M._VAMPIRE   = VAMPIRE
 M._HOLE      = HOLE
 M._CW        = CW
 M._CH        = CH
@@ -684,9 +738,9 @@ function M.vampire()
   if state == "sleep" then
     openEyes()
     canvas[I.zzz].text = hs.styledtext.new("z z z", {font={name="Helvetica", size=10}, color=CLEAR})
-    setState("idle")
   end
-  showVampireFace()
+  setState("vampire")
+  showVampirePose()
 end
 
 return M

@@ -53,6 +53,7 @@ local B    = bunny._B
 local BL   = bunny._BL
 local LAYBACK_R = bunny._LAYBACK_R
 local LAYBACK_L = bunny._LAYBACK_L
+local VAMPIRE   = bunny._VAMPIRE
 local HOLE     = bunny._HOLE
 local CW   = bunny._CW
 local CH   = bunny._CH
@@ -211,9 +212,31 @@ do
   local head = HOLE.head
   ok("hole eye in head",  HOLE.eye.x >= head.x and HOLE.eye.x + HOLE.eye.w <= head.x + head.w)
   ok("hole eye2 in head", HOLE.eye2.x >= head.x and HOLE.eye2.x + HOLE.eye2.w <= head.x + head.w)
-  -- Valid states include inhole
-  local validStates = {hop=true, idle=true, heart=true, layback=true, sleep=true, inhole=true}
+  -- Valid states include inhole and vampire
+  local validStates = {hop=true, idle=true, heart=true, layback=true, sleep=true, inhole=true, vampire=true}
   ok("_getState returns valid state", validStates[bunny._getState()] ~= nil)
+end
+
+-- ─── 7b. vampire frames (face-on, sharp teeth, thought bubble) ─────────────────
+
+do
+  ok("VAMPIRE has eye",   VAMPIRE.eye ~= nil)
+  ok("VAMPIRE has eye2",  VAMPIRE.eye2 ~= nil)
+  ok("VAMPIRE has nose",  VAMPIRE.nose ~= nil)
+  ok("VAMPIRE has mouthOpen", VAMPIRE.mouthOpen ~= nil)
+  ok("VAMPIRE has fangL", VAMPIRE.fangL ~= nil)
+  ok("VAMPIRE has fangR", VAMPIRE.fangR ~= nil)
+  ok("VAMPIRE has bubble",    VAMPIRE.bubble ~= nil)
+  ok("VAMPIRE has bubbleTail", VAMPIRE.bubbleTail ~= nil)
+  ok("VAMPIRE has bloodEmoji", VAMPIRE.bloodEmoji ~= nil)
+  -- Both eyes fit in head
+  local head = VAMPIRE.head
+  ok("vampire eye in head",  VAMPIRE.eye.x >= head.x and VAMPIRE.eye.x + VAMPIRE.eye.w <= head.x + head.w)
+  ok("vampire eye2 in head", VAMPIRE.eye2.x >= head.x and VAMPIRE.eye2.x + VAMPIRE.eye2.w <= head.x + head.w)
+  -- All vampire frames fit in canvas
+  for key, f in pairs(VAMPIRE) do
+    ok("VAMPIRE: " .. key .. " fits", f.x + f.w <= CW, "x+w=" .. (f.x + f.w))
+  end
 end
 
 -- ─── 8. toggle lifecycle ──────────────────────────────────────────────────────
@@ -316,6 +339,7 @@ do
   bunny.vampire()
   ok("vampire when running: no error", true)
   ok("vampire when running: enters vampire mode", bunny._isVampire())
+  eq("vampire when running: state is vampire", "vampire", bunny._getState())
 
   bunny.stop()
 end
