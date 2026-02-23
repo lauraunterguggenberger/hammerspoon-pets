@@ -1,0 +1,25 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run Hammerspoon tests",
+      "type": "shell",
+      "command": "osascript",
+      "args": [
+        "-e",
+        "tell application \"System Events\" to keystroke \"`\" using {command down, control down, option down}"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    }
+  ]
+}
