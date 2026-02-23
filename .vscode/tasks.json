@@ -4,10 +4,10 @@
     {
       "label": "Run Hammerspoon tests",
       "type": "shell",
-      "command": "osascript",
+      "command": "bash",
       "args": [
-        "-e",
-        "tell application \"System Events\" to keystroke \"`\" using {command down, control down, option down}"
+        "-c",
+        "exit_code=$(hs -c \"local r = require('tests'); print('EXIT:' .. (r.failed > 0 and 1 or 0))\" 2>&1 | (grep '^EXIT:' || echo 'EXIT:1') | cut -d: -f2); exit ${exit_code:-1}"
       ],
       "options": {
         "cwd": "${workspaceFolder}"
