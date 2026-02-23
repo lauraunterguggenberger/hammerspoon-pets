@@ -30,4 +30,5 @@ jobs:
 
       - name: Run tests
         run: |
-          hs -c "local r = require('tests'); os.exit(r.failed > 0 and 1 or 0)"
+          exit_code=$(hs -c "local r = require('tests'); print('EXIT:' .. (r.failed > 0 and 1 or 0))" | grep '^EXIT:' | cut -d: -f2)
+          exit "${exit_code:-1}"
