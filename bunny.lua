@@ -31,7 +31,7 @@ local I = {
   backArm=12, frontArm=13, heart=14, footL=15, footR=16,
   eye2=17,  -- second eye (layback only; face-on view)
   fangL=18, fangR=19, bloodDrop=20,  -- vampire: fangs (white) + mouth
-  bubble=21, bubbleTail=22, bloodEmoji=23,  -- vampire thought bubble
+  bubble=21, bubbleTail=22, bloodEmoji=23,  -- unused (thought bubble removed)
   mouthArc=24,  -- Pac-Man style open mouth (ellipticalArc)
   tooth1=25, tooth2=26, tooth3=27, tooth4=28, tooth5=29, tooth6=30,
 }
@@ -124,29 +124,32 @@ local LAYBACK_L = {
   bloodDrop= mir(LAYBACK_R.bloodDrop),
 }
 
--- Vampire pose: face-on, Pac-Man mouth with teeth, blood emoji in thought bubble
+-- Vampire pose: face-on, Pac-Man mouth with teeth
+-- Head is enlarged so the big mouth fits proportionally inside the face
 local VAMPIRE = {
   body      = {x=2,   y=72, w=86, h=28},  -- same as LAYBACK
-  head      = {x=30,  y=38, w=40, h=42},
+  head      = {x=16,  y=22, w=78, h=74},  -- bigger face so mouth fits (was 40×42)
   tail      = {x=10,  y=78, w=16, h=12},
-  earFar    = {x=48,  y=8,  w=18, h=36},
-  earNear   = {x=28,  y=6,  w=20, h=38},
-  innerFar  = {x=52, y=12, w=10, h=28},
-  innerNear = {x=30, y=10, w=12, h=30},
-  eye       = {x=54, y=58, w=9,  h=9 },
-  eye2      = {x=37, y=58, w=9,  h=9 },
-  nose      = {x=55, y=68, w=6,  h=6 },
-  -- Pac-Man style mouth: ellipticalArc (C-shape, 70-290 deg leaves ~80° bite)
-  mouthArc  = {x=28, y=68, w=54, h=28},  -- frame for arc; startAngle/endAngle set in code
-  fangL     = {x=38, y=60, w=4,  h=18},  -- left fang (WHITE, prominent)
-  fangR     = {x=68, y=60, w=4,  h=18},  -- right fang (WHITE)
-  -- teeth along mouth edge (small white rectangles)
-  tooth1    = {x=30, y=70, w=4,  h=6 },  tooth2 = {x=42, y=72, w=4, h=6 },
-  tooth3    = {x=54, y=74, w=4,  h=6 },  tooth4 = {x=66, y=72, w=4, h=6 },
-  tooth5    = {x=76, y=70, w=4,  h=6 },  tooth6 = {x=52, y=88, w=6, h=4 },  -- bottom
-  bubble    = {x=18, y=0,  w=74, h=34},
-  bubbleTail= {x=48, y=32, w=14, h=10},
-  bloodEmoji= {x=34, y=6,  w=42, h=24},
+  earFar    = {x=50,  y=2,  w=20, h=40},
+  earNear   = {x=26,  y=0,  w=24, h=44},
+  innerFar  = {x=54, y=6,  w=12, h=32},
+  innerNear = {x=28, y=4,  w=14, h=36},
+  eye       = {x=58, y=44, w=11, h=11},  -- scaled up for bigger head
+  eye2      = {x=41, y=44, w=11, h=11},
+  nose      = {x=52, y=56, w=7,  h=7 },
+  -- Pac-Man style mouth: ellipticalArc (C-shape)
+  mouthArc  = {x=24, y=60, w=62, h=28},  -- raised a few px
+  fangL     = {x=34, y=52, w=5,  h=20},  -- left fang (WHITE, prominent)
+  fangR     = {x=71, y=52, w=5,  h=20},  -- right fang (WHITE)
+  -- teeth along mouth edge (slightly longer for visibility)
+  tooth1    = {x=26, y=64, w=5,  h=10},  tooth2 = {x=40, y=66, w=5, h=10},
+  tooth3    = {x=54, y=68, w=5,  h=10},  tooth4 = {x=68, y=66, w=5, h=10},
+  tooth5    = {x=80, y=64, w=5,  h=10},  tooth6 = {x=52, y=82, w=7, h=8 },  -- bottom
+  -- arms and legs: jumping at you!
+  backArm   = {x=0,  y=64, w=18, h=14},   -- left arm reaching out
+  frontArm  = {x=92, y=64, w=18, h=14},  -- right arm reaching out
+  footL     = {x=10, y=92, w=24, h=16},   -- left foot
+  footR     = {x=76, y=92, w=24, h=16},   -- right foot
 }
 
 -- Rabbit hole: black opening, head + ears peeking up (scared by pop)
@@ -191,7 +194,7 @@ local WALK = 1.6
 local HOPH = 22
 local HOPR = 0.13
 local EARB = 5
-local LURCH_SCALE = 1.4
+local LURCH_SCALE = 1.2   -- smaller so vampire fits in canvas when he gets big
 local LURCH_SIZE = math.floor(CW * LURCH_SCALE)   -- 154
 local LURCH_OFFSET = math.floor((LURCH_SIZE - CW) / 2)  -- 22
 
@@ -348,6 +351,12 @@ local function showVampirePose()
   vampireActive = true
   vampireLurch = 0
   canvas[I.zzz].frame = HIDDEN  -- hide sleep "z z z" if coming from sleep
+  canvas[I.mouth].frame = HIDDEN
+  canvas[I.bloodDrop].frame = HIDDEN
+  canvas[I.bubble].frame = HIDDEN
+  canvas[I.bubbleTail].frame = HIDDEN
+  canvas[I.bloodEmoji].frame = HIDDEN
+  -- vampire body/head/ears/eyes
   canvas[I.body].frame = VAMPIRE.body
   canvas[I.head].frame = VAMPIRE.head
   canvas[I.tail].frame = VAMPIRE.tail
@@ -358,13 +367,11 @@ local function showVampirePose()
   canvas[I.eye].frame = VAMPIRE.eye
   canvas[I.eye2].frame = VAMPIRE.eye2
   canvas[I.nose].frame = VAMPIRE.nose
-  canvas[I.mouth].frame = HIDDEN
-  canvas[I.bloodDrop].frame = HIDDEN
   -- Pac-Man mouth: ellipticalArc (C-shape, bite on right)
   canvas[I.mouthArc].frame = VAMPIRE.mouthArc
   canvas[I.mouthArc].fillColor = BLOODRED
-  canvas[I.mouthArc].startAngle = 70   -- degrees
-  canvas[I.mouthArc].endAngle = 290   -- 220° arc, 80° bite
+  canvas[I.mouthArc].startAngle = 70
+  canvas[I.mouthArc].endAngle = 290
   -- white fangs and teeth
   canvas[I.fangL].fillColor = WHITE
   canvas[I.fangR].fillColor = WHITE
@@ -376,10 +383,12 @@ local function showVampirePose()
   canvas[I.tooth4].frame = VAMPIRE.tooth4
   canvas[I.tooth5].frame = VAMPIRE.tooth5
   canvas[I.tooth6].frame = VAMPIRE.tooth6
-  -- thought bubble with blood emoji
-  canvas[I.bubble].frame = VAMPIRE.bubble
-  canvas[I.bubbleTail].frame = VAMPIRE.bubbleTail
-  canvas[I.bloodEmoji].frame = VAMPIRE.bloodEmoji
+  -- arms and legs: jumping at you!
+  canvas[I.heart].frame = HIDDEN
+  canvas[I.backArm].frame = VAMPIRE.backArm
+  canvas[I.frontArm].frame = VAMPIRE.frontArm
+  canvas[I.footL].frame = VAMPIRE.footL
+  canvas[I.footR].frame = VAMPIRE.footR
 end
 
 local function showLaybackPose()
@@ -411,6 +420,10 @@ local function showLaybackPose()
 end
 
 local HOLE_STROKE = {red=0.15, green=0.15, blue=0.2, alpha=1}  -- dark edge for hole
+
+local function offsetY(f, dy)
+  return {x=f.x, y=f.y + dy, w=f.w, h=f.h}
+end
 
 local function showHolePose()
   holeActive = true
@@ -563,7 +576,7 @@ local function animate()
       setState("hop")
     end
 
-  -- ── VAMPIRE (face-on, Pac-Man mouth, blood emoji; lurch at 1 sec) ──────────
+  -- ── VAMPIRE (face-on, Pac-Man mouth; lurch at 1 sec) ───────────────────────
   elseif state == "vampire" then
     -- at 1 sec (~30 frames) in: jump up into screen and get bigger
     if stateAge >= 30 and vampireLurch == 0 then vampireLurch = 1 end
