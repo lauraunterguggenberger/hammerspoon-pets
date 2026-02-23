@@ -223,7 +223,7 @@ do
   ok("VAMPIRE has eye",   VAMPIRE.eye ~= nil)
   ok("VAMPIRE has eye2",  VAMPIRE.eye2 ~= nil)
   ok("VAMPIRE has nose",  VAMPIRE.nose ~= nil)
-  ok("VAMPIRE has mouthOpen", VAMPIRE.mouthOpen ~= nil)
+  ok("VAMPIRE has mouthArc", VAMPIRE.mouthArc ~= nil)
   ok("VAMPIRE has fangL", VAMPIRE.fangL ~= nil)
   ok("VAMPIRE has fangR", VAMPIRE.fangR ~= nil)
   ok("VAMPIRE has bubble",    VAMPIRE.bubble ~= nil)

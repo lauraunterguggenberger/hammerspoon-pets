@@ -30,8 +30,10 @@ local I = {
   eye=8, nose=9, mouth=10, zzz=11,
   backArm=12, frontArm=13, heart=14, footL=15, footR=16,
   eye2=17,  -- second eye (layback only; face-on view)
-  fangL=18, fangR=19, bloodDrop=20,  -- vampire: fangs + mouth interior
+  fangL=18, fangR=19, bloodDrop=20,  -- vampire: fangs (white) + mouth
   bubble=21, bubbleTail=22, bloodEmoji=23,  -- vampire thought bubble
+  mouthArc=24,  -- Pac-Man style open mouth (ellipticalArc)
+  tooth1=25, tooth2=26, tooth3=27, tooth4=28, tooth5=29, tooth6=30,
 }
 local HIDDEN = {x=0, y=0, w=0, h=0}
 
@@ -122,7 +124,7 @@ local LAYBACK_L = {
   bloodDrop= mir(LAYBACK_R.bloodDrop),
 }
 
--- Vampire pose: face-on, eyes+nose visible, mouth with sharp teeth, blood emoji in thought bubble
+-- Vampire pose: face-on, Pac-Man mouth with teeth, blood emoji in thought bubble
 local VAMPIRE = {
   body      = {x=2,   y=72, w=86, h=28},  -- same as LAYBACK
   head      = {x=30,  y=38, w=40, h=42},
@@ -134,9 +136,14 @@ local VAMPIRE = {
   eye       = {x=54, y=58, w=9,  h=9 },
   eye2      = {x=37, y=58, w=9,  h=9 },
   nose      = {x=55, y=68, w=6,  h=6 },
-  mouthOpen = {x=40, y=72, w=30, h=10},  -- BLOODRED oval (bloodDrop)
-  fangL     = {x=43, y=66, w=3,  h=14},  -- left canine
-  fangR     = {x=64, y=66, w=3,  h=14},  -- right canine
+  -- Pac-Man style mouth: ellipticalArc (C-shape, 70-290 deg leaves ~80° bite)
+  mouthArc  = {x=28, y=68, w=54, h=28},  -- frame for arc; startAngle/endAngle set in code
+  fangL     = {x=38, y=60, w=4,  h=18},  -- left fang (WHITE, prominent)
+  fangR     = {x=68, y=60, w=4,  h=18},  -- right fang (WHITE)
+  -- teeth along mouth edge (small white rectangles)
+  tooth1    = {x=30, y=70, w=4,  h=6 },  tooth2 = {x=42, y=72, w=4, h=6 },
+  tooth3    = {x=54, y=74, w=4,  h=6 },  tooth4 = {x=66, y=72, w=4, h=6 },
+  tooth5    = {x=76, y=70, w=4,  h=6 },  tooth6 = {x=52, y=88, w=6, h=4 },  -- bottom
   bubble    = {x=18, y=0,  w=74, h=34},
   bubbleTail= {x=48, y=32, w=14, h=10},
   bloodEmoji= {x=34, y=6,  w=42, h=24},
@@ -177,12 +184,16 @@ local vampireMode = false
 local vampireUntil = 0   -- timestamp when to exit vampire mode
 local vampireKiss = false  -- true during kiss-goodbye phase
 local vampireKissAge = 0
+local vampireLurch = 0   -- 0=pre, 1-20=animating jump/scale, 21+=done (1 sec in, then lurch)
 
 -- ─── animation parameters ────────────────────────────────────────────────────
 local WALK = 1.6
 local HOPH = 22
 local HOPR = 0.13
 local EARB = 5
+local LURCH_SCALE = 1.4
+local LURCH_SIZE = math.floor(CW * LURCH_SCALE)   -- 154
+local LURCH_OFFSET = math.floor((LURCH_SIZE - CW) / 2)  -- 22
 
 -- ─── canvas construction ─────────────────────────────────────────────────────
 -- Builds a canvas whose elements are laid out according to frame table f.
@@ -215,7 +226,14 @@ local function buildCanvas(f)
     { type="rectangle", frame=HIDDEN,     fillColor=WHITE,     strokeColor=SOFTGRAY, strokeWidth=1, roundedRectRadii={xRadius=12,yRadius=12} },
     { type="oval",      frame=HIDDEN,     fillColor=WHITE,     strokeColor=SOFTGRAY, strokeWidth=1 },
     { type="text",      frame=HIDDEN,     textAlignment="center",
-      text=hs.styledtext.new("🩸", {font={name="Apple Color Emoji", size=22}}) }
+      text=hs.styledtext.new("🩸", {font={name="Apple Color Emoji", size=22}}) },
+    { type="ellipticalArc", frame=HIDDEN, fillColor=BLOODRED, strokeColor=CLEAR, strokeWidth=0 },
+    { type="rectangle", frame=HIDDEN, fillColor=WHITE, strokeColor=CLEAR, strokeWidth=0 },
+    { type="rectangle", frame=HIDDEN, fillColor=WHITE, strokeColor=CLEAR, strokeWidth=0 },
+    { type="rectangle", frame=HIDDEN, fillColor=WHITE, strokeColor=CLEAR, strokeWidth=0 },
+    { type="rectangle", frame=HIDDEN, fillColor=WHITE, strokeColor=CLEAR, strokeWidth=0 },
+    { type="rectangle", frame=HIDDEN, fillColor=WHITE, strokeColor=CLEAR, strokeWidth=0 },
+    { type="rectangle", frame=HIDDEN, fillColor=WHITE, strokeColor=CLEAR, strokeWidth=0 }
   )
   return c
 end
@@ -272,6 +290,16 @@ local function hideVampirePose()
   canvas[I.fangL].frame = HIDDEN
   canvas[I.fangR].frame = HIDDEN
   canvas[I.bloodDrop].frame = HIDDEN
+  canvas[I.mouthArc].frame = HIDDEN
+  for i = I.tooth1, I.tooth6 do canvas[i].frame = HIDDEN end
+  vampireLurch = 0
+  -- reset transformation and restore canvas size
+  for _, c in ipairs({canvasR, canvasL}) do
+    if c then
+      c:transformation(nil)
+      c:size({w=CW, h=CH})
+    end
+  end
   vampireActive = false
 end
 
@@ -318,6 +346,7 @@ end
 
 local function showVampirePose()
   vampireActive = true
+  vampireLurch = 0
   canvas[I.zzz].frame = HIDDEN  -- hide sleep "z z z" if coming from sleep
   canvas[I.body].frame = VAMPIRE.body
   canvas[I.head].frame = VAMPIRE.head
@@ -329,17 +358,24 @@ local function showVampirePose()
   canvas[I.eye].frame = VAMPIRE.eye
   canvas[I.eye2].frame = VAMPIRE.eye2
   canvas[I.nose].frame = VAMPIRE.nose
-  canvas[I.mouth].frame = HIDDEN  -- omega hidden; we use bloodDrop + fangs for mouth
-  canvas[I.backArm].frame = HIDDEN
-  canvas[I.frontArm].frame = HIDDEN
-  canvas[I.heart].frame = HIDDEN
-  canvas[I.footL].frame = base.footL
-  canvas[I.footR].frame = base.footR
-  -- mouth: red oval interior + two sharp fangs
-  canvas[I.bloodDrop].frame = VAMPIRE.mouthOpen
-  canvas[I.bloodDrop].fillColor = BLOODRED
+  canvas[I.mouth].frame = HIDDEN
+  canvas[I.bloodDrop].frame = HIDDEN
+  -- Pac-Man mouth: ellipticalArc (C-shape, bite on right)
+  canvas[I.mouthArc].frame = VAMPIRE.mouthArc
+  canvas[I.mouthArc].fillColor = BLOODRED
+  canvas[I.mouthArc].startAngle = 70   -- degrees
+  canvas[I.mouthArc].endAngle = 290   -- 220° arc, 80° bite
+  -- white fangs and teeth
+  canvas[I.fangL].fillColor = WHITE
+  canvas[I.fangR].fillColor = WHITE
   canvas[I.fangL].frame = VAMPIRE.fangL
   canvas[I.fangR].frame = VAMPIRE.fangR
+  canvas[I.tooth1].frame = VAMPIRE.tooth1
+  canvas[I.tooth2].frame = VAMPIRE.tooth2
+  canvas[I.tooth3].frame = VAMPIRE.tooth3
+  canvas[I.tooth4].frame = VAMPIRE.tooth4
+  canvas[I.tooth5].frame = VAMPIRE.tooth5
+  canvas[I.tooth6].frame = VAMPIRE.tooth6
   -- thought bubble with blood emoji
   canvas[I.bubble].frame = VAMPIRE.bubble
   canvas[I.bubbleTail].frame = VAMPIRE.bubbleTail
@@ -367,6 +403,8 @@ local function showLaybackPose()
   canvas[I.fangL].frame = HIDDEN
   canvas[I.fangR].frame = HIDDEN
   canvas[I.bloodDrop].frame = HIDDEN
+  canvas[I.mouthArc].frame = HIDDEN
+  for i = I.tooth1, I.tooth6 do canvas[i].frame = HIDDEN end
   canvas[I.bubble].frame = HIDDEN
   canvas[I.bubbleTail].frame = HIDDEN
   canvas[I.bloodEmoji].frame = HIDDEN
@@ -398,6 +436,8 @@ local function showHolePose()
   canvas[I.fangL].frame = HIDDEN
   canvas[I.fangR].frame = HIDDEN
   canvas[I.bloodDrop].frame = HIDDEN
+  canvas[I.mouthArc].frame = HIDDEN
+  for i = I.tooth1, I.tooth6 do canvas[i].frame = HIDDEN end
 end
 
 -- Flip: hide the current canvas, show the other one at the same position.
@@ -523,11 +563,44 @@ local function animate()
       setState("hop")
     end
 
-  -- ── VAMPIRE (face-on, sharp teeth, blood emoji in thought bubble) ──────────
+  -- ── VAMPIRE (face-on, Pac-Man mouth, blood emoji; lurch at 1 sec) ──────────
   elseif state == "vampire" then
-    local jump = (ballBounce > 0 and -math.abs(math.sin(ballBounce * 0.2)) * 24 or 0)
-    canvas:topLeft({x=math.floor(posX), y=math.floor(gY + jump)})
-    -- pose is set by showVampirePose; no movement
+    -- at 1 sec (~30 frames) in: jump up into screen and get bigger
+    if stateAge >= 30 and vampireLurch == 0 then vampireLurch = 1 end
+    if vampireLurch >= 1 and vampireLurch <= 20 then
+      vampireLurch = vampireLurch + 1
+      local t = (vampireLurch - 1) / 20  -- 0..1 over 20 frames
+      local ease = t * t  -- ease-in (quicker start)
+      local jumpUp = ease * 100  -- move up 100px
+      local scale = 1 + ease * 0.4  -- grow to 1.4x
+      -- Resize both canvases so scaled content fits (no clipping)
+      for _, c in ipairs({canvasR, canvasL}) do
+        if c then c:size({w=LURCH_SIZE, h=LURCH_SIZE}) end
+      end
+      canvas:topLeft({x=math.floor(posX - LURCH_OFFSET), y=math.floor(gY - jumpUp - LURCH_OFFSET)})
+      local m = hs.canvas.matrix.translate(LURCH_OFFSET, LURCH_OFFSET)
+        :append(hs.canvas.matrix.translate(CW/2, CH/2):scale(scale):translate(-CW/2, -CH/2))
+      canvas:transformation(m)
+      if vampireLurch > 20 then vampireLurch = 21 end
+    elseif vampireLurch == 0 then
+      for _, c in ipairs({canvasR, canvasL}) do
+        if c then c:size({w=CW, h=CH}) end
+      end
+      canvas:topLeft({x=math.floor(posX), y=math.floor(gY)})
+      canvas:transformation(nil)
+    else
+      -- vampireLurch >= 21: stay at lurched position (set once, then static)
+      if vampireLurch == 21 then
+        vampireLurch = 22
+        for _, c in ipairs({canvasR, canvasL}) do
+          if c then c:size({w=LURCH_SIZE, h=LURCH_SIZE}) end
+        end
+        canvas:topLeft({x=math.floor(posX - LURCH_OFFSET), y=math.floor(gY - 100 - LURCH_OFFSET)})
+        local m = hs.canvas.matrix.translate(LURCH_OFFSET, LURCH_OFFSET)
+          :append(hs.canvas.matrix.translate(CW/2, CH/2):scale(LURCH_SCALE):translate(-CW/2, -CH/2))
+        canvas:transformation(m)
+      end
+    end
 
   -- ── INHOLE (scared, peeking to see if safe) ─────────────────────────────────
   elseif state == "inhole" then

@@ -619,6 +619,12 @@ ball.registerPet(bunny)
 ball.registerPet(pig)
 hs.hotkey.bind(nudge, "t", function() ball.throw() end)
 
+-- F13 = full-screen screenshot to Desktop (single key, no modifiers)
+hs.hotkey.bind({}, "F13", function()
+  local filename = os.date("~/Desktop/screenshot_%Y%m%d_%H%M%S.png")
+  hs.execute("screencapture -x " .. filename)
+end)
+
 -- Run all tests: mash+` (backtick)
 hs.hotkey.bind(mash, "`", function()
   package.loaded["tests"] = nil
