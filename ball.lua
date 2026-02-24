@@ -28,6 +28,7 @@ function M.registerPet(pet)
 end
 
 local function overlaps(ax, ay, aw, ah, bx, by, bw, bh)
+  if not (ax and ay and aw and ah and bx and by and bw and bh) then return false end
   return ax < bx + bw and ax + aw >= bx and ay < by + bh and ay + ah >= by
 end
 
@@ -55,7 +56,7 @@ local function animate()
   local ballBox = {x=x, y=y, w=BALL_R*2, h=BALL_R*2}
   for _, pet in ipairs(pets) do
     local bounds = pet.getBounds()
-    if bounds and overlaps(ballBox.x, ballBox.y, ballBox.w, ballBox.h, bounds.x, bounds.y, bounds.w, bounds.h) then
+    if bounds and bounds.x and bounds.y and bounds.w and bounds.h and overlaps(ballBox.x, ballBox.y, ballBox.w, ballBox.h, bounds.x, bounds.y, bounds.w, bounds.h) then
       pet.bounce()
       vx = -vx * PET_BOUNCE_DAMP
       vy = -math.abs(vy) * PET_BOUNCE_DAMP

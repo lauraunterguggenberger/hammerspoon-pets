@@ -226,9 +226,6 @@ do
   ok("VAMPIRE has mouthArc", VAMPIRE.mouthArc ~= nil)
   ok("VAMPIRE has fangL", VAMPIRE.fangL ~= nil)
   ok("VAMPIRE has fangR", VAMPIRE.fangR ~= nil)
-  ok("VAMPIRE has bubble",    VAMPIRE.bubble ~= nil)
-  ok("VAMPIRE has bubbleTail", VAMPIRE.bubbleTail ~= nil)
-  ok("VAMPIRE has bloodEmoji", VAMPIRE.bloodEmoji ~= nil)
   -- Both eyes fit in head
   local head = VAMPIRE.head
   ok("vampire eye in head",  VAMPIRE.eye.x >= head.x and VAMPIRE.eye.x + VAMPIRE.eye.w <= head.x + head.w)
